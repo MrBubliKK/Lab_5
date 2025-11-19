@@ -1023,30 +1023,28 @@ class WatCompiler(ListLangListener):
 
     def exitFunctionCall(self, ctx: ListLangParser.FunctionCallContext):
         """
-        Обработка вызова функции или переменной‑лямбды (включая параметры функций).
+        Обработка вызова функции или переменной‑лямбды (включая параметры и блочные переменные в $main).
         """
         func_name = ctx.IDENTIFIER().getText()
 
-        # Извлекаем аргументы: ArgumentListContext -> [ArgumentContext]
+        # Корректно извлекаем аргументы
         arg_list_parent_ctx: Optional[ListLangParser.ArgumentListContext] = ctx.argumentList()
         arg_ctx_list: List[
             ListLangParser.ArgumentContext] = arg_list_parent_ctx.argument() if arg_list_parent_ctx else []
 
-        # --- Встроенные функции ---
+        # --- Встроенные ---
         if func_name == "read":
             if arg_ctx_list:
                 raise Exception("Compiler Error: 'read' function does not take arguments.")
             self.current_wat_buffer.append('    (call $read_num)')
             return
         elif func_name == "write":
-            # write обрабатывается отдельным правилом exitWriteStatement
             self.current_wat_buffer.append('    (nop)')
             return
         elif func_name in ("len", "dequeue"):
-            # Эти встроенные обрабатываются в exitLenCall/exitDequeueCall
             return
 
-        # --- Попытка вызвать глобальную пользовательскую функцию ---
+        # --- Пользовательская глобальная функция ---
         func_info = self.flat_funcs.get(func_name)
         if func_info:
             for i, param in enumerate(func_info.parameters):
@@ -1060,20 +1058,21 @@ class WatCompiler(ListLangListener):
             self.current_wat_buffer.append(f'    (call ${func_name})')
             return
 
-        # --- Попытка вызвать переменную‑лямбду (локальную/глобальную/параметр) ---
+        # --- Переменная‑лямбда: локальная/параметр/глобальная/блочная ---
         var_info = self._lookup_var_info_in_flat_table(func_name, self.current_function_name)
 
-        # Fallback: если не нашли по текущей функции/глобально, попробуем найти любой квалифицированный ключ вида "<scope>::func_name"
+        # Fallback: если не нашли по текущей функции/глобально, ищем любой квалифицированный ключ вида "<scope>::func_name"
         if not var_info:
             for qualified, info in self.flat_vars.items():
                 if qualified.endswith(f"::{func_name}"):
                     var_info = info
                     break
 
+        # Если знаем, что это лямбда — готовим вызов по её сигнатуре
         if var_info and var_info.type == Type.LAMBDA:
             lambda_sig = var_info.lambda_signature
 
-            # 1) Подготовка аргументов под ожидаемые типы (если есть сигнатура)
+            # Подготовка аргументов
             if lambda_sig:
                 for i, param in enumerate(lambda_sig.params):
                     if i < len(arg_ctx_list):
@@ -1084,18 +1083,17 @@ class WatCompiler(ListLangListener):
                             if self.get_wat_type(arg_expr_type) == "f64":
                                 self.current_wat_buffer.append('    (i32.trunc_f64_s)')
             else:
-                # Нет сигнатуры — дефолт: приводим все аргументы к f64
                 for a in arg_ctx_list:
                     arg_expr_type = self.semantic_analyzer.get_expression_type(a.expression())
                     self._ensure_f64_on_stack(arg_expr_type)
 
-            # 2) Положить на стек индекс функции из самой переменной (local/global)
+            # Индекс функции из переменной
             access_op, idx_wat_type = self._resolve_variable_access(func_name)
             self.current_wat_buffer.append(f'    ({access_op})')
             if idx_wat_type == "f64":
                 self.current_wat_buffer.append('    (i32.trunc_f64_s)')
 
-            # 3) Тип для call_indirect — из сигнатуры; иначе дефолт: все параметры f64, результат f64
+            # Тип для call_indirect
             if lambda_sig:
                 param_types_wat = [self.get_wat_type(p.type) for p in lambda_sig.params]
                 result_type_wat = self.get_wat_type(lambda_sig.return_type)
@@ -1112,12 +1110,30 @@ class WatCompiler(ListLangListener):
             func_type_def += '))'
             self.unique_lambda_types_wat.add(func_type_def)
 
-            # 4) Непрямой вызов по индексу
             self.current_wat_buffer.append(f'    (call_indirect (type {func_type_name}))')
             return
 
-        # --- Если ни функция, ни лямбда ---
-        raise Exception(f"Compiler Error: Unknown function or non-callable variable '{func_name}'.")
+        # --- Последний безопасный fallback: трактуем идентификатор как переменную‑лямбду без сигнатуры ---
+        # Это покрывает блочные переменные в $main, объявленные неявно (например, current_op).
+        # 1) Приводим аргументы к f64
+        for a in arg_ctx_list:
+            arg_expr_type = self.semantic_analyzer.get_expression_type(a.expression())
+            self._ensure_f64_on_stack(arg_expr_type)
+
+        # 2) Получаем значение переменной (создаст глобал, если не найдено ранее)
+        access_op, idx_wat_type = self._resolve_variable_access(func_name)
+        self.current_wat_buffer.append(f'    ({access_op})')
+        if idx_wat_type == "f64":
+            self.current_wat_buffer.append('    (i32.trunc_f64_s)')
+
+        # 3) Дефолтный тип: (param f64 ... ) (result f64)
+        param_types_wat = ["f64"] * len(arg_ctx_list)
+        result_type_wat = "f64"
+        func_type_name = f"$func_type_fallback_{len(arg_ctx_list)}"
+        func_type_def = f'(type {func_type_name} (func {" ".join([f"(param {t})" for t in param_types_wat])} (result {result_type_wat})))'
+        self.unique_lambda_types_wat.add(func_type_def)
+
+        self.current_wat_buffer.append(f'    (call_indirect (type {func_type_name}))')
 
     def enterLambdaReturn(self, ctx: ListLangParser.LambdaReturnContext):
         self._enter_lambda_common(ctx)
