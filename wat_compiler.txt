@@ -358,50 +358,78 @@ class WatCompiler(ListLangListener):
         return None
 
     def _resolve_variable_access(self, var_name: str) -> Tuple[str, str]:
+        """
+        Возвращает WAT‑операцию для доступа к переменной (local.get/global.get).
+        Если переменная не найдена в таблице символов — создаём её на лету.
+        """
         var_info = self._lookup_var_info_in_flat_table(var_name, self.current_function_name)
+
         if not var_info:
-            raise Exception(f"Compiler Error: Variable '{var_name}' not found in any scope for WAT generation.")
+            wat_type = "f64"  # по умолчанию число
+            if self.current_function_name and self.current_function_name != "$main":
+                # Локальная переменная
+                if self.current_function_name not in self.function_all_locals:
+                    self.function_all_locals[self.current_function_name] = {}
+                if var_name not in self.function_all_locals[self.current_function_name]:
+                    self.function_all_locals[self.current_function_name][var_name] = wat_type
+                return f"local.get ${var_name}", wat_type
+            else:
+                # Глобальная переменная
+                if f'(global ${var_name} ' not in "".join(self.wat_globals):
+                    default_value = "(f64.const 0.0)"
+                    self.wat_globals.append(f'  (global ${var_name} (mut {wat_type}) {default_value})')
+                return f"global.get ${var_name}", wat_type
 
+        # Если переменная найдена — стандартная логика
         wat_type = self.get_wat_type(var_info.type)
-        access_op = ""
-
         if self.current_function_name and self.current_function_name != "$main" and var_info.scope_name != "global":
-            # It's a local variable in a user-defined function or lambda
-            access_op = f"local.get ${var_name}"
             if self.current_function_name not in self.function_all_locals:
                 self.function_all_locals[self.current_function_name] = {}
             if var_name not in self.function_all_locals[self.current_function_name]:
                 self.function_all_locals[self.current_function_name][var_name] = wat_type
+            return f"local.get ${var_name}", wat_type
         else:
-            # It's a global variable or we are in main code
-            access_op = f"global.get ${var_name}"
             if f'(global ${var_name} ' not in "".join(self.wat_globals):
                 default_value = "(f64.const 0.0)" if wat_type == "f64" else "(i32.const 0)"
                 self.wat_globals.append(f'  (global ${var_name} (mut {wat_type}) {default_value})')
-
-        return access_op, wat_type
+            return f"global.get ${var_name}", wat_type
 
     def _resolve_variable_assignment(self, var_name: str) -> str:
+        """
+        Возвращает WAT‑операцию для присваивания переменной (local.set/global.set).
+        Если переменная не найдена в таблице символов — создаём её на лету.
+        """
         var_info = self._lookup_var_info_in_flat_table(var_name, self.current_function_name)
+
         if not var_info:
-            raise Exception(f"Compiler Error: Variable '{var_name}' not found in any scope for WAT assignment.")
+            wat_type = "f64"  # по умолчанию число
+            if self.current_function_name and self.current_function_name != "$main":
+                # Локальная переменная
+                if self.current_function_name not in self.function_all_locals:
+                    self.function_all_locals[self.current_function_name] = {}
+                if var_name not in self.function_all_locals[self.current_function_name]:
+                    self.function_all_locals[self.current_function_name][var_name] = wat_type
+                return f"local.set ${var_name}"
+            else:
+                # Глобальная переменная
+                if f'(global ${var_name} ' not in "".join(self.wat_globals):
+                    default_value = "(f64.const 0.0)"
+                    self.wat_globals.append(f'  (global ${var_name} (mut {wat_type}) {default_value})')
+                return f"global.set ${var_name}"
 
+        # Если переменная найдена — стандартная логика
         wat_type = self.get_wat_type(var_info.type)
-        assign_op = ""
-
         if self.current_function_name and self.current_function_name != "$main" and var_info.scope_name != "global":
-            assign_op = f"local.set ${var_name}"
             if self.current_function_name not in self.function_all_locals:
                 self.function_all_locals[self.current_function_name] = {}
             if var_name not in self.function_all_locals[self.current_function_name]:
                 self.function_all_locals[self.current_function_name][var_name] = wat_type
+            return f"local.set ${var_name}"
         else:
-            assign_op = f"global.set ${var_name}"
             if f'(global ${var_name} ' not in "".join(self.wat_globals):
                 default_value = "(f64.const 0.0)" if wat_type == "f64" else "(i32.const 0)"
                 self.wat_globals.append(f'  (global ${var_name} (mut {wat_type}) {default_value})')
-
-        return assign_op
+            return f"global.set ${var_name}"
 
     def _compile_string_literal(self, s: str):
         escaped_s = ''.join([f'\\{ord(c):02x}' if ord(c) < 32 or ord(c) > 126 or c in ['"', '\\'] else c for c in s])
