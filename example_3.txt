@@ -1,0 +1,87 @@
+/* Лабораторная работа 1. Пример 3: Подпрограммы и лямбды */
+/* Демонстрация: перегрузка, передача по результату (out), области видимости, лямбда-функции */
+
+/* Объявление перегруженных подпрограмм в начале */
+func process_data(x) /* x - по значению */
+    {
+        x * 2 -> result;
+        write("Processing value: ", result);
+        return result; /* Возвращает NUMBER */
+    }
+end
+
+func process_data(lst, value out) /* value - ПО РЕЗУЛЬТАТУ (out) */
+    {
+        lst << value;
+        "Modified" -> value; /* Это изменение будет видно вне функции */
+        write("Processing list and value: ", lst);
+    }
+end
+
+/* Функция высшего порядка, принимающая лямбду */
+func apply_transform(data, transformer)
+    {
+        /* Вызываем переданную лямбду-функцию */
+        return transformer(data);
+    }
+end
+
+/* ========== Начало основного кода ========== */
+100 -> global_var;
+[1, 2, 3] -> my_list;
+"Original" -> data_to_change;
+
+/* Вызов первой версии process_data */
+process_data(global_var) -> new_value;
+write("New value: ", new_value);
+write("Global var after call: ", global_var); /* Не изменилась (по значению) */
+
+/* Вызов второй версии. Указываем, что второй параметр передается по результату */
+process_data(my_list, data_to_change out);
+
+write("List after call: ", my_list); /* Изменился */
+write("Data after call: ", data_to_change); /* Изменилась на "Modified" (out) */
+
+/* Демонстрация области видимости */
+"Global" -> shadowing_var;
+if new_value > 150 then
+    {
+        "Local" -> shadowing_var; /* Локальная переменная в блоке if */
+        write("Inside block: ", shadowing_var);
+    }
+end
+/* Здесь снова видна глобальная shadowing_var */
+write("Outside block: ", shadowing_var);
+
+
+/* ========== Демонстрация лямбда-функций ========== */
+
+write("\n=== Lambda Demo ===");
+
+/* 1. Простая лямбда: увеличение числа */
+lambda (x) -> x + 10 -> increment_fn;
+apply_transform(5, increment_fn) -> result_temp;
+write("5 + 10 = ", result_temp);
+
+/* 2. Лямбда, переданная напрямую в вызов функции (анонимно) */
+apply_transform(9, lambda (x) -> x * x) -> squared;
+write("9 squared is ", squared);
+
+/* 3. Лямбда с двумя параметрами и телом из нескольких выражений */
+lambda (a, b) ->
+    {
+        a + b -> sum_val;
+        sum_val * sum_val -> result_val;
+        return result_val;
+    } -> sum_squares;
+
+/* 4. Исправленное замыкание:
+   - Мы используем len(my_list), чтобы передать NUMBER,
+     иначе вызов apply_transform с LIST вызовет ошибку несовместимости типов.
+   - Лямбда list_transformer замыкается на global_var.
+*/
+lambda (list_len) -> list_len * 2 + global_var -> list_transformer; /* Замыкание на global_var */
+
+/* Вызов с len(my_list) -> NUMBER. Исправлена ошибка типов. */
+apply_transform(len(my_list), list_transformer) -> calculated_size;
+write("Calculated size of my_list (with closure): ", calculated_size);

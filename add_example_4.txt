@@ -1,0 +1,161 @@
+/* Лабораторная работа 1. Пример 4: Продвинутые лямбды */
+/* Демонстрация: захват переменных, присваивание лямбд, возврат лямбд из функций */
+
+/* === 1. Захват переменных из окружающего контекста (замыкание) === */
+
+"Hello, " -> prefix;
+100 -> base_value;
+
+/* Лямбда захватывает переменные 'prefix' и 'base_value' из внешней области видимости */
+/* Захват происходит ПО ЗНАЧЕНИЮ на момент создания лямбды */
+lambda (name) ->
+    {
+        /* Захваченные переменные используются внутри лямбды */
+        prefix + name -> greeting;
+        base_value + len(name) -> new_value;
+        write(greeting, "! Calculated value: ", new_value);
+        return new_value;
+    }
+-> greeting_calculator;
+
+/* Вызов лямбды, которая использует захваченные переменные */
+greeting_calculator("Alice") -> result_1;
+greeting_calculator("Bob") -> result_2;
+
+write("Results from closure lambda: ", result_1, ", ", result_2);
+
+/* Изменяем захваченную переменную после создания лямбды */
+"Greetings, " -> prefix;
+/* Лямбда продолжает использовать оригинальное значение "Hello, " (захват по значению) */
+greeting_calculator("Charlie") -> result_3;
+write("Result with modified prefix: ", result_3);
+
+
+/* === 2. Присваивание лямбд переменным и использование в выражениях === */
+
+/* Лямбда присваивается переменной */
+lambda (x) -> x * 2 -> doubler;
+lambda (x) -> x + 1 -> incrementer;
+
+/* Массив операций (лямбд) */
+[doubler, incrementer] -> operations;
+
+5 -> start_value;
+for i from 0 to len(operations) do
+    {
+        /* Достаем лямбду из списка и вызываем ее */
+        operations[i] -> current_op;
+        current_op(start_value) -> start_value;
+        write("After operation ", i, ": ", start_value);
+    }
+end
+
+/* Лямбда как часть сложного выражения */
+incrementer(10) -> temp_result;
+doubler(temp_result) -> complex_result; // (10+1)*2 = 22
+write("Complex lambda expression result: ", complex_result);
+
+
+/* === 3. Возврат лямбды из функции === */
+
+/* Функция, возвращающая лямбду (фабрика функций) */
+func create_multiplier(factor)
+    {
+        /* Возвращаемая лямбда захватывает параметр 'factor' */
+        return lambda (x) -> x * factor;
+    }
+end
+
+/* Создаем специализированные функции-умножители */
+create_multiplier(10) -> times_ten;
+create_multiplier(100) -> times_hundred;
+
+write("Times ten: ", times_ten(5));     // 50
+write("Times hundred: ", times_hundred(5)); // 500
+
+/* Функция, возвращающая лямбду на основе условия */
+func get_operation(op_name)
+    {
+        switch op_name
+            case "square":
+                {
+                    return lambda (x) -> x * x;
+                }
+            case "cube":
+                {
+                    return lambda (x) -> x * x * x;
+                }
+            default:
+                {
+                    return lambda (x) -> x; /* Тождественная функция */
+                }
+        end
+    }
+end
+
+get_operation("square") -> squarer;
+get_operation("cube") -> cuber;
+
+write("Squarer(4): ", squarer(4)); // 16
+write("Cuber(3): ", cuber(3));     // 27
+
+
+/* === 4. Комбинированный пример: лямбда, захватывающая другую лямбду === */
+
+lambda (x) -> x + 1 -> simple_op;
+
+func create_advanced_op(initial_op, repeat_count)
+    {
+        /* Захватываем и параметр, и другую лямбду */
+        return lambda (x) ->
+            {
+                initial_op(x) -> temp;
+                repeat_count -> i;
+                while i > 1 do
+                    {
+                        initial_op(temp) -> temp;
+                        i - 1 -> i;
+                    }
+                end
+                return temp;
+            };
+    }
+end
+
+/* Создаем лямбду, которая применяет simple_op 3 раза */
+create_advanced_op(simple_op, 3) -> triple_increment;
+
+write("Triple increment of 5: ", triple_increment(5)); // 5+1+1+1 = 8
+
+
+/* === 5. Лямбда в структуре данных и сложные преобразования === */
+
+/* Создаем список трансформаций */
+[
+    lambda (x) -> x + 1,
+    lambda (x) -> x * 2,
+    lambda (x) -> x * x
+] -> transformations;
+
+/* Применяем цепочку трансформаций */
+10 -> value;
+for i from 0 to len(transformations) do
+    {
+        transformations[i] -> transform;
+        transform(value) -> value;
+        write("After transformation ", i, ": ", value);
+    }
+end
+
+/* Лямбда, возвращающая другую лямбду */
+lambda (base) ->
+    {
+        return lambda (x) -> x + base;
+    }
+-> adder_factory;
+
+adder_factory(5) -> add_five;
+adder_factory(10) -> add_ten;
+
+write("Add five to 7: ", add_five(7));  // 12
+write("Add ten to 7: ", add_ten(7));    // 17

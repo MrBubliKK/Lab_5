@@ -1,0 +1,47 @@
+/* Лабораторная работа 1. Пример 1: Основы языка */
+/* Демонстрация: типы, неявное объявление, операции, ввод/вывод, if-else, while */
+
+/* Неявное объявление и инициализация переменных */
+42 -> global_number;
+read() -> global_element; /* Встроенная функция read() */
+[1, 2, 3, 4, 5] -> global_list;   /* Литерал списка */
+
+/* Встроенные функции вывода */
+write("Initial global_list: ", global_list);
+
+/* Сложное выражение со скобками */
+((global_number + 10) * 2 - 5) -> result;
+write("Result of calculation: ", result);
+
+/* Условный оператор с then и end */
+if result < 100 and global_element != 0 then
+    { /* Блочный оператор (область видимости начинается с отступа) */
+        10 -> temp;
+        write("Condition passed! Temp inside block: ", temp);
+    }
+else
+    {
+        write("Condition failed!");
+    }
+end
+
+/* Операция работы со списком: добавление элемента */
+global_list << result;
+write("List after append: ", global_list);
+
+/* Цикл while */
+0 -> counter;
+while counter < len(global_list) do
+    {
+        write("Element at index ", counter, ": ", global_list[counter]);
+        counter + 1 -> counter;
+    }
+end
+
+/* Множественное присваивание (новый синтаксис) */
+val_a, val_b <- 10, 20;
+write("After new multi-assignment: val_a = ", val_a, ", val_b = ", val_b);
+
+/* Старое многоцелевое присваивание (последовательность одиночных) */
+100 -> a, 200 -> b;
+write("After old multi-assignment: a = ", a, ", b = ", b);

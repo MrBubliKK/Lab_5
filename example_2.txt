@@ -1,0 +1,59 @@
+/* Лабораторная работа 1. Пример 2: Циклы и списки */
+/* Демонстрация: until, for, неявное преобразование, операции над списками */
+
+/* Объявление подпрограммы ДО начала основного кода */
+func print_list(msg, l)
+    {
+        write(msg, l);
+        return len(l);
+    }
+end
+
+/* Основной код начинается здесь */
+[10, 20, 30] -> queue;
+
+/* Операция выборки из очереди */
+dequeue from queue -> first_element;
+write("First element of queue: ", first_element, ", queue now: ", queue);
+
+/* Цикл until (делать... пока не) */
+0 -> index;
+do
+    {
+        /* Неявное преобразование: element * number */
+        queue[index] * 2 -> queue[index];
+        index + 1 -> index;
+    }
+until index >= len(queue)
+end /* <--- Добавлен END для do-until */
+
+/* Вызов пользовательской подпрограммы */
+print_list("Queue after processing: ", queue) -> list_length;
+
+/* Цикл for по диапазону */
+write("Counting to ", list_length);
+for i from 0 to list_length do
+    {
+        write(i);
+    }
+end
+
+/* Многовариантный условный оператор switch-case */
+switch list_length
+    case 0:
+        {
+            write("The list is empty");
+        }
+    case 1:
+        {
+            write("The list has one element");
+        }
+    case 2:
+        {
+            write("The list has two elements");
+        }
+    default:
+        {
+            write("The list is long");
+        }
+end
