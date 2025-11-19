@@ -116,45 +116,39 @@ def main_analyzer(file_path):
 
     parse_tree = None
     try:
-        # Синтаксический анализ
+        # --- Синтаксический анализ ---
         print(f"[{filename}] --- Начало синтаксического анализа ---")
         parse_tree = create_parse_tree(parser)
 
         syntax_errors_count = len(syntax_error_reporter.errors)
-
         if syntax_errors_count > 0:
             print(f"[{filename}] Синтаксический анализ завершен с {syntax_errors_count} ошибками.")
             print(f"[{filename}] Найденные синтаксические ошибки:")
             for err in syntax_error_reporter.errors:
                 print(f"  {err}")
-            print(f"[{filename}] Пропуск семантического анализа из-за синтаксических ошибок.")
         else:
             print(f"[{filename}] Синтаксический анализ успешно завершен. Ошибок не найдено.")
 
-            # ИНТЕГРАЦИЯ С СЕМАНТИЧЕСКИМ АНАЛИЗОМ
-            print(f"\n[{filename}] --- Переход к семантическому анализу ---")
-            semantic_analyzer_instance = perform_semantic_analysis(parse_tree, parser, filename)
+        # --- Семантический анализ (всегда запускается) ---
+        print(f"\n[{filename}] --- Переход к семантическому анализу ---")
+        semantic_analyzer_instance = perform_semantic_analysis(parse_tree, parser, filename)
 
-            if semantic_analyzer_instance and semantic_analyzer_instance.errors:
-                print(
-                    f"[{filename}] Семантический анализ завершен с {len(semantic_analyzer_instance.errors)} ошибками.")
-                # SemanticAnalyzer already prints errors, no need to print again here.
-            else:
-                print(f"[{filename}] Семантический анализ успешно завершен. Ошибок не обнаружено.")
+        if semantic_analyzer_instance and semantic_analyzer_instance.errors:
+            print(f"[{filename}] Семантический анализ завершен с {len(semantic_analyzer_instance.errors)} ошибками.")
+            # Ошибки уже выведены самим SemanticAnalyzer
+            print(f"[{filename}] Кодогенерация пропущена из-за семантических ошибок.")
+        else:
+            print(f"[{filename}] Семантический анализ успешно завершен. Ошибок не обнаружено.")
 
-                # НОВОЕ: ВЫЗОВ КОМПИЛЯТОРА
-                print(f"\n[{filename}] --- Начало кодогенерации (WAT) ---")
-                wat_output = compile_listlang_to_wat(parse_tree, parser, semantic_analyzer_instance, filename)
+            # --- Кодогенерация ---
+            print(f"\n[{filename}] --- Начало кодогенерации (WAT) ---")
+            wat_output = compile_listlang_to_wat(parse_tree, parser, semantic_analyzer_instance, filename)
 
-                # Сохраняем WAT-код в файл с расширением .wat
-                output_wat_path = os.path.join(os.path.dirname(file_path), filename.replace('.txt', '.wat'))
-                with open(output_wat_path, 'w', encoding='utf-8') as f:
-                    f.write(wat_output)
-                print(f"[{filename}] Кодогенерация завершена. Вывод сохранен в {output_wat_path}")
-                # Если хотите, можете также напечатать WAT-код в консоль для отладки:
-                # print("\n--- Сгенерированный WAT-код ---\n", wat_output)
-                # print("-------------------------------\n")
-
+            # Сохраняем WAT-код в файл
+            output_wat_path = os.path.join(os.path.dirname(file_path), filename.replace('.txt', '.wat'))
+            with open(output_wat_path, 'w', encoding='utf-8') as f:
+                f.write(wat_output)
+            print(f"[{filename}] Кодогенерация завершена. Вывод сохранен в {output_wat_path}")
 
     except Exception as e:
         print(f"[{filename}] Критическая ошибка во время анализа: {e}", file=sys.stderr)
@@ -162,6 +156,7 @@ def main_analyzer(file_path):
         traceback.print_exc()
 
     print(f"======== Завершение анализа файла: {filename} ========\n")
+
 
 
 # --- Точка входа в программу ---
